@@ -1,22 +1,22 @@
 local modpath = core.get_modpath(core.get_current_modname())
 
 ccc = ccc or {}
-ccc.modpath = modpath
-ccc.state = {}
+ccc.state = ccc.state or {}
 
-local function load(path)
-	dofile(modpath .. "/" .. path)
-end
+dofile(modpath .. "/lib/util.lua")
+dofile(modpath .. "/content/nodes.lua")
 
-load("lib/util.lua")
-load("content/nodes.lua")
-load("lib/state.lua")
+dofile(modpath .. "/lib/state.lua")
 
-load("systems/world.lua")
-load("systems/player.lua")
-load("systems/player_light.lua")
-load("systems/wax.lua")
-load("systems/hud.lua")
-load("systems/candles.lua")
-load("systems/torches.lua")
-load("systems/game_state.lua")
+dofile(modpath .. "/systems/world.lua")
+dofile(modpath .. "/systems/player.lua")
+dofile(modpath .. "/systems/player_light.lua")
+dofile(modpath .. "/systems/candle_light.lua")
+dofile(modpath .. "/systems/wax.lua")
+dofile(modpath .. "/systems/hud.lua")
+dofile(modpath .. "/systems/candles.lua")
+dofile(modpath .. "/systems/torches.lua")
+dofile(modpath .. "/systems/plants.lua")
+dofile(modpath .. "/systems/ice.lua")
+dofile(modpath .. "/systems/doors.lua")
+dofile(modpath .. "/systems/game_state.lua")

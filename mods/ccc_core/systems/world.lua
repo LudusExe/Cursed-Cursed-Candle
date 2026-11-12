@@ -1,13 +1,24 @@
-local ROOM_MIN = {x = -8, y = 0, z = -4}
-local ROOM_MAX = {x = 8, y = 7, z = 12}
-local SPAWN_POS = {x = 0, y = 2, z = 8}
-local mod_storage = core.get_mod_storage()
-local ROOM_VERSION = "2"
+local ROOM_MIN = {
+	x = -8,
+	y = 0,
+	z = -4,
+}
 
-local ROOM_VERSION_KEY = "room_version"
+local ROOM_MAX = {
+	x = 8,
+	y = 7,
+	z = 12,
+}
 
-local building_room = false
-local waiting_player = nil
+local SPAWN_POS = {
+	x = 0,
+	y = 2,
+	z = 8,
+}
+
+-- La stanza è solo un ambiente di test.
+-- Viene costruita una volta per avvio del mondo.
+local room_initialized = false
 
 
 local function set_node(pos, name)
@@ -17,13 +28,127 @@ local function set_node(pos, name)
 end
 
 
-local function fill_box(minp, maxp, name)
-	for x = minp.x, maxp.x do
-		for y = minp.y, maxp.y do
-			for z = minp.z, maxp.z do
+local function build_room()
+	-- Floor
+	for x = ROOM_MIN.x, ROOM_MAX.x do
+		for z = ROOM_MIN.z, ROOM_MAX.z do
+			set_node(
+				{x = x, y = ROOM_MIN.y, z = z},
+				"ccc_core:stone"
+			)
+		end
+	end
+
+	-- Ceiling
+	for x = ROOM_MIN.x, ROOM_MAX.x do
+		for z = ROOM_MIN.z, ROOM_MAX.z do
+			set_node(
+				{x = x, y = ROOM_MAX.y, z = z},
+				"ccc_core:stone"
+			)
+		end
+	end
+
+	-- North wall
+	for x = ROOM_MIN.x, ROOM_MAX.x do
+		for y = ROOM_MIN.y + 1, ROOM_MAX.y - 1 do
+
+			-- Door opening
+			if not (
+				x >= -1 and
+				x <= 1 and
+				y >= 1 and
+				y <= 3
+			) then
+				set_node(
+					{x = x, y = y, z = ROOM_MIN.z},
+					"ccc_core:stone"
+				)
+			end
+
+		end
+	end
+
+	-- South wall
+	for x = ROOM_MIN.x, ROOM_MAX.x do
+		for y = ROOM_MIN.y + 1, ROOM_MAX.y - 1 do
+			set_node(
+				{x = x, y = y, z = ROOM_MAX.z},
+				"ccc_core:stone"
+			)
+		end
+	end
+
+	-- West / East walls
+	for z = ROOM_MIN.z, ROOM_MAX.z do
+		for y = ROOM_MIN.y + 1, ROOM_MAX.y - 1 do
+
+			set_node(
+				{x = ROOM_MIN.x, y = y, z = z},
+				"ccc_core:stone"
+			)
+
+			set_node(
+				{x = ROOM_MAX.x, y = y, z = z},
+				"ccc_core:stone"
+			)
+
+		end
+	end
+
+	-- Existing candles
+	set_node(
+		{x = -5, y = 2, z = 3},
+		"ccc_core:candle"
+	)
+
+	set_node(
+		{x = 5, y = 2, z = 3},
+		"ccc_core:candle"
+	)
+
+	-- Phase 2: torches
+	set_node(
+		{x = -5, y = 1, z = 1},
+		"ccc_core:torch_off"
+	)
+
+	set_node(
+		{x = 5, y = 1, z = 1},
+		"ccc_core:torch_off"
+	)
+
+	-- Phase 3: plant
+	set_node(
+		{x = -2, y = 1, z = 2},
+		"ccc_core:plant_seed"
+	)
+
+	-- Phase 3: ice
+	set_node(
+		{x = 2, y = 1, z = 2},
+		"ccc_core:ice"
+	)
+
+	-- Phase 3: magic door
+	-- Two blocks high
+	set_node(
+		{x = 0, y = 1, z = ROOM_MIN.z},
+		"ccc_core:magic_door_closed"
+	)
+
+	set_node(
+		{x = 0, y = 2, z = ROOM_MIN.z},
+		"ccc_core:magic_door_closed"
+	)
+
+	-- Clear spawn area
+	for x = -1, 1 do
+		for y = 1, 3 do
+			for z = 6, 10 do
 				set_node(
 					{x = x, y = y, z = z},
-					name
+					"air"
 				)
 			end
 		end
@@ -31,170 +156,28 @@ local function fill_box(minp, maxp, name)
 end
 
 
-local function clear_room_interior()
-	fill_box(
-		{x = ROOM_MIN.x + 1, y = ROOM_MIN.y + 1, z = ROOM_MIN.z + 1},
-		{x = ROOM_MAX.x - 1, y = ROOM_MAX.y - 1, z = ROOM_MAX.z - 1},
-		"air"
-	)
-end
-
-
-local function build_room()
-	clear_room_interior()
-
-	fill_box(
-		{x = ROOM_MIN.x, y = ROOM_MIN.y, z = ROOM_MIN.z},
-		{x = ROOM_MAX.x, y = ROOM_MIN.y, z = ROOM_MAX.z},
-		"ccc_core:stone"
-	)
-
-	fill_box(
-		{x = ROOM_MIN.x, y = ROOM_MAX.y, z = ROOM_MIN.z},
-		{x = ROOM_MAX.x, y = ROOM_MAX.y, z = ROOM_MAX.z},
-		"ccc_core:stone"
-	)
-
-	fill_box(
-		{x = ROOM_MIN.x, y = ROOM_MIN.y + 1, z = ROOM_MIN.z},
-		{x = ROOM_MIN.x, y = ROOM_MAX.y - 1, z = ROOM_MAX.z},
-		"ccc_core:stone"
-	)
-
-	fill_box(
-		{x = ROOM_MAX.x, y = ROOM_MIN.y + 1, z = ROOM_MIN.z},
-		{x = ROOM_MAX.x, y = ROOM_MAX.y - 1, z = ROOM_MAX.z},
-		"ccc_core:stone"
-	)
-
-	fill_box(
-		{x = ROOM_MIN.x + 1, y = ROOM_MIN.y + 1, z = ROOM_MIN.z},
-		{x = ROOM_MAX.x - 1, y = ROOM_MAX.y - 1, z = ROOM_MIN.z},
-		"ccc_core:stone"
-	)
-
-	fill_box(
-		{x = ROOM_MIN.x + 1, y = ROOM_MIN.y + 1, z = ROOM_MAX.z},
-		{x = ROOM_MAX.x - 1, y = ROOM_MAX.y - 1, z = ROOM_MAX.z},
-		"ccc_core:stone"
-	)
-
-	for x = -1, 1 do
-		for y = 1, 3 do
-			set_node(
-				{x = x, y = y, z = ROOM_MIN.z},
-				"air"
-			)
-		end
-	end
-
-	set_node(
-		{x = -5, y = 1, z = 3},
-		"ccc_core:candle"
-	)
-
-	set_node(
-		{x = 5, y = 1, z = 3},
-		"ccc_core:candle"
-	)
-
-	if core.registered_nodes["ccc_core:torch_off"] then
-		set_node(
-			{x = -5, y = 1, z = 1},
-			"ccc_core:torch_off"
-		)
-
-		set_node(
-			{x = 5, y = 1, z = 1},
-			"ccc_core:torch_off"
-		)
-
-		set_node(
-			{x = -5, y = 1, z = 6},
-			"ccc_core:torch_off"
-		)
-
-		set_node(
-			{x = 5, y = 1, z = 6},
-			"ccc_core:torch_off"
-		)
-	end
-
-	mod_storage:set_string(
-		ROOM_VERSION_KEY,
-		ROOM_VERSION
-	)
-end
-
-
-local function prepare_player(player)
-	if not player or not player:is_player() then
-		return
-	end
-	player:set_pos(SPAWN_POS)
-
-	local state = ccc.state_api.get(player)
-
-	state.checkpoint = {
-		x = SPAWN_POS.x,
-		y = SPAWN_POS.y,
-		z = SPAWN_POS.z,
-	}
-end
-
-
-local function room_is_current()
-	return mod_storage:get_string(ROOM_VERSION_KEY) == ROOM_VERSION
-end
-
-
-local function ensure_room(player)
-	if not player or not player:is_player() then
+local function initialize_world()
+	if room_initialized then
 		return
 	end
 
-	if room_is_current() then
-		prepare_player(player)
-		return
-	end
+	room_initialized = true
 
-	if building_room then
-		waiting_player = player
-		return
-	end
+	build_room()
 
-	building_room = true
-	waiting_player = player
 	core.emerge_area(
 		ROOM_MIN,
-		ROOM_MAX,
-		function(blockpos, action, calls_remaining, param)
-
-			if calls_remaining ~= 0 then
-				return
-			end
-
-			build_room()
-
-			building_room = false
-
-			if waiting_player
-				and waiting_player:is_player() then
-
-				prepare_player(waiting_player)
-			end
-
-			waiting_player = nil
-		end
+		ROOM_MAX
 	)
+
+	local players = core.get_connected_players()
+
+	for _, player in ipairs(players) do
+		player:set_pos(SPAWN_POS)
+	end
 end
 
 
-core.register_on_joinplayer(function(player)
-	ensure_room(player)
-end)
-
-
-core.register_on_newplayer(function(player)
-	ensure_room(player)
+core.register_on_mods_loaded(function()
+	core.after(1, initialize_world)
 end)

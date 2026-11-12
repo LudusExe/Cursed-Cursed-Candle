@@ -1,102 +1,148 @@
-local TORCH_LIGHT_RADIUS = 2.5
-local TORCH_CHECK_INTERVAL = 0.2
+-- Torch system.
+--
+-- Torches are controlled by the player's candle flame.
+--
+-- States:
+--   ccc_core:torch_off
+--   ccc_core:torch_on
+--
+-- Future puzzle systems can control them through:
+--   ccc.torches.set_lit(pos, true)
+--   ccc.torches.set_lit(pos, false)
+
+ccc.torches = ccc.torches or {}
+
+local IGNITE_RADIUS = 2.5
+local CHECK_INTERVAL = 0.2
 
 local accumulator = 0
 
-local function switch_torch(pos, lit)
+
+local function play_sound(pos, sound_name)
+	core.sound_play(sound_name, {
+		pos = pos,
+		gain = 0.8,
+		max_hear_distance = 8,
+	})
+end
+
+
+local function set_lit(pos, lit)
+	local node = core.get_node_or_nil(pos)
+
+	if not node then
+		return false
+	end
+
+	local target_name
+
 	if lit then
-		core.set_node(pos, {
-			name = "ccc_core:torch_on",
-		})
+		target_name = "ccc_core:torch_on"
 	else
-		core.set_node(pos, {
-			name = "ccc_core:torch_off",
-		})
+		target_name = "ccc_core:torch_off"
 	end
+
+	if node.name == target_name then
+		return false
+	end
+
+	if node.name ~= "ccc_core:torch_off"
+		and node.name ~= "ccc_core:torch_on" then
+		return false
+	end
+
+	core.set_node(pos, {
+		name = target_name,
+	})
+
+	if lit then
+		play_sound(pos, "ccc_torch_ignite")
+	else
+		play_sound(pos, "ccc_torch_extinguish")
+	end
+
+	return true
 end
 
-local function toggle_torch(pos, node, player)
-	if not player or not player:is_player() then
-		return
-	end
 
-	if node.name == "ccc_core:torch_off" then
-		switch_torch(pos, true)
-		ccc.hud_message(player, "The torch catches fire.", 2)
-	elseif node.name == "ccc_core:torch_on" then
-		switch_torch(pos, false)
-		ccc.hud_message(player, "The torch goes dark.", 2)
-	end
+function ccc.torches.set_lit(pos, lit)
+	return set_lit(pos, lit)
 end
 
-local torch_definition = {
-	description = "Torch",
+
+local selection_box = {
+	type = "wallmounted",
+
+	wall_top = {
+		-0.15, 0.35, -0.15,
+		 0.15, 0.5, 0.15,
+	},
+
+	wall_bottom = {
+		-0.15, -0.5, -0.15,
+		 0.15, -0.35, 0.15,
+	},
+
+	wall_side = {
+		-0.5, -0.15, -0.15,
+		-0.35, 0.15, 0.15,
+	},
+}
+
+
+local groups = {
+	not_in_creative_inventory = 1,
+}
+
+
+core.register_node("ccc_core:torch_off", {
+	description = "Torch (off)",
+
 	drawtype = "torchlike",
+
 	tiles = {"ccc_candle_block.png"},
 
 	paramtype = "light",
 	paramtype2 = "wallmounted",
 
+	light_source = 0,
+
 	walkable = false,
-	pointable = true,
+	pointable = false,
 	diggable = false,
 	buildable_to = false,
 
-	groups = {
-		not_in_creative_inventory = 1,
-	},
+	groups = groups,
 
-	selection_box = {
-		type = "wallmounted",
-		wall_top = {-0.15, 0.35, -0.15, 0.15, 0.5, 0.15},
-		wall_bottom = {-0.15, -0.5, -0.15, 0.15, -0.35, 0.15},
-		wall_side = {-0.5, -0.15, -0.15, -0.35, 0.15, 0.15},
-	},
-}
-
-core.register_node("ccc_core:torch_off", {
-	description = "Torch (off)",
-
-	drawtype = torch_definition.drawtype,
-	tiles = torch_definition.tiles,
-	paramtype = torch_definition.paramtype,
-	paramtype2 = torch_definition.paramtype2,
-	walkable = torch_definition.walkable,
-	pointable = torch_definition.pointable,
-	diggable = torch_definition.diggable,
-	buildable_to = torch_definition.buildable_to,
-	groups = torch_definition.groups,
-	selection_box = torch_definition.selection_box,
-	light_source = 0,
-
-	on_rightclick = function(pos, node, clicker)
-		toggle_torch(pos, node, clicker)
-	end,
+	selection_box = selection_box,
 })
+
 
 core.register_node("ccc_core:torch_on", {
 	description = "Torch (on)",
 
-	drawtype = torch_definition.drawtype,
-	tiles = torch_definition.tiles,
-	paramtype = torch_definition.paramtype,
-	paramtype2 = torch_definition.paramtype2,
-	walkable = torch_definition.walkable,
-	pointable = torch_definition.pointable,
-	diggable = torch_definition.diggable,
-	buildable_to = torch_definition.buildable_to,
-	groups = torch_definition.groups,
-	selection_box = torch_definition.selection_box,
+	drawtype = "torchlike",
+
+	tiles = {"ccc_candle_block.png"},
+
+	paramtype = "light",
+	paramtype2 = "wallmounted",
+
 	light_source = 12,
 
-	on_rightclick = function(pos, node, clicker)
-		toggle_torch(pos, node, clicker)
-	end,
+	walkable = false,
+	pointable = false,
+	diggable = false,
+	buildable_to = false,
+
+	groups = groups,
+
+	selection_box = selection_box,
 })
 
-local function can_be_ignited_by_player(player, torch_pos)
-	local player_pos = player:get_pos()
 
+local function can_ignite(player, torch_pos)
+	local player_pos = player:get_pos()
 
 	local flame_pos = {
 		x = player_pos.x,
@@ -114,66 +160,58 @@ local function can_be_ignited_by_player(player, torch_pos)
 		dz * dz
 	)
 
-	if distance > TORCH_LIGHT_RADIUS then
+	if distance > IGNITE_RADIUS then
 		return false
 	end
-	return core.line_of_sight(flame_pos, torch_pos)
+
+	local visible = core.line_of_sight(
+		flame_pos,
+		torch_pos
+	)
+
+	return visible
 end
+
 
 local function ignite_nearby_torches(player)
 	local pos = player:get_pos()
 
 	local min_pos = {
-		x = math.floor(pos.x - TORCH_LIGHT_RADIUS),
-		y = math.floor(pos.y - TORCH_LIGHT_RADIUS),
-		z = math.floor(pos.z - TORCH_LIGHT_RADIUS),
+		x = math.floor(pos.x - IGNITE_RADIUS),
+		y = math.floor(pos.y - IGNITE_RADIUS),
+		z = math.floor(pos.z - IGNITE_RADIUS),
 	}
 
 	local max_pos = {
-		x = math.floor(pos.x + TORCH_LIGHT_RADIUS),
-		y = math.floor(pos.y + TORCH_LIGHT_RADIUS),
-		z = math.floor(pos.z + TORCH_LIGHT_RADIUS),
+		x = math.floor(pos.x + IGNITE_RADIUS),
+		y = math.floor(pos.y + IGNITE_RADIUS),
+		z = math.floor(pos.z + IGNITE_RADIUS),
 	}
 
-	local torch_positions = core.find_nodes_in_area(
+	local torches = core.find_nodes_in_area(
 		min_pos,
 		max_pos,
 		{"ccc_core:torch_off"}
 	)
 
-	for _, torch_pos in ipairs(torch_positions) do
-		if can_be_ignited_by_player(player, torch_pos) then
-			switch_torch(torch_pos, true)
+	for _, torch_pos in ipairs(torches) do
+		if can_ignite(player, torch_pos) then
+			set_lit(torch_pos, true)
 		end
 	end
 end
 
+
 core.register_globalstep(function(dtime)
 	accumulator = accumulator + dtime
 
-	if accumulator < TORCH_CHECK_INTERVAL then
+	if accumulator < CHECK_INTERVAL then
 		return
 	end
 
 	accumulator = 0
 
 	for _, player in ipairs(core.get_connected_players()) do
-		local state = ccc.state_api.get(player)
-
-		if not state.game_over then
-			ignite_nearby_torches(player)
-		end
+		ignite_nearby_torches(player)
 	end
 end)
-
-core.sound_play("ccc_torch_ignite", {
-	pos = pos,
-	gain = 0.8,
-	max_hear_distance = 8,
-})
-
-core.sound_play("ccc_torch_extinguish", {
-	pos = pos,
-	gain = 0.8,
-	max_hear_distance = 8,
-})

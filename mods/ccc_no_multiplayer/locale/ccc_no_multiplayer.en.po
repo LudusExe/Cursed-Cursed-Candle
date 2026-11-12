@@ -1,0 +1,10 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: ccc_no_multiplayer\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "This is not a multiplayer game! Please disable server hosting and try again."
+msgstr "This is not a multiplayer game! Please disable server hosting and try again."
